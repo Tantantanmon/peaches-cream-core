@@ -231,40 +231,89 @@ export function render() {
   // import
   document.getElementById('tbs-menu-import').onclick = () => {
     tbsToggleMenu(false);
-    const val = prompt('JSON을 붙여넣으세요:');
+    const val = prompt('태그를 붙여넣으세요:\n\n[그룹명]\n태그1\n태그2\n\n또는 JSON 형식도 가능해요.');
     if (!val || !val.trim()) return;
+    const gs = window.parent?.__PC_GLOBAL_STORE__;
+    if (!gs) return;
+
+    // ── JSON 시도
     try {
       const data = JSON.parse(val.trim());
-      if (!data.groups || !Array.isArray(data.groups)) { showToast('잘못된 형식이에요'); return; }
-      const gs = window.parent?.__PC_GLOBAL_STORE__;
-      if (!gs) return;
-      data.groups.forEach(ig => {
-        const isDefault = TB_DEFAULT_GROUPS.some(dg => dg.id === ig.id);
-        if (isDefault) {
-          gs.config.deletedGroups = (gs.config.deletedGroups || []).filter(id => id !== ig.id);
-          gs.config.deletedTags[ig.id] = [];
-          const fixed = TB_FIXED[ig.id] || [];
-          const newCustom = (ig.tags || []).filter(t => !fixed.includes(t));
-          if (!gs.config.customTags[ig.id]) gs.config.customTags[ig.id] = [];
-          newCustom.forEach(t => { if (!gs.config.customTags[ig.id].includes(t)) gs.config.customTags[ig.id].push(t); });
-        } else {
-          if (!gs.config.customGroups.find(cg => cg.id === ig.id)) {
-            gs.config.customGroups.push({ id: ig.id, label: ig.label, tags: ig.tags || [] });
+      if (data.groups && Array.isArray(data.groups)) {
+        data.groups.forEach(ig => {
+          const isDefault = TB_DEFAULT_GROUPS.some(dg => dg.id === ig.id);
+          if (isDefault) {
+            gs.config.deletedGroups = (gs.config.deletedGroups || []).filter(id => id !== ig.id);
+            gs.config.deletedTags[ig.id] = [];
+            const fixed = TB_FIXED[ig.id] || [];
+            const newCustom = (ig.tags || []).filter(t => !fixed.includes(t));
+            if (!gs.config.customTags[ig.id]) gs.config.customTags[ig.id] = [];
+            newCustom.forEach(t => { if (!gs.config.customTags[ig.id].includes(t)) gs.config.customTags[ig.id].push(t); });
           } else {
+            if (!gs.config.customGroups.find(cg => cg.id === ig.id)) {
+              gs.config.customGroups.push({ id: ig.id, label: ig.label, tags: [] });
+            }
             const existing = gs.config.customGroups.find(cg => cg.id === ig.id);
-            (ig.tags || []).forEach(t => { if (!existing.tags.includes(t)) existing.tags.push(t); });
+            const allExisting = [...(existing.tags||[]), ...(gs.config.customTags[ig.id]||[])];
+            if (!gs.config.customTags[ig.id]) gs.config.customTags[ig.id] = [];
+            (ig.tags || []).forEach(t => { if (!allExisting.includes(t)) gs.config.customTags[ig.id].push(t); });
           }
-          if (!gs.config.customTags[ig.id]) gs.config.customTags[ig.id] = [];
+        });
+        if (data.favoriteTags && Array.isArray(data.favoriteTags)) {
+          data.favoriteTags.forEach(t => { if (!gs.config.favoriteTags.includes(t)) gs.config.favoriteTags.push(t); });
         }
-      });
-      if (data.favoriteTags && Array.isArray(data.favoriteTags)) {
-        data.favoriteTags.forEach(t => { if (!gs.config.favoriteTags.includes(t)) gs.config.favoriteTags.push(t); });
+        if (saveStore) saveStore();
+        showToast('가져오기 완료 ✓');
+        renderSidebar(); renderTags();
+        return;
       }
-      if (saveStore) saveStore();
-      showToast('가져오기 완료 ✓');
-      renderSidebar();
-      renderTags();
-    } catch (e) { showToast('JSON 파싱 실패'); }
+    } catch(e) { /* JSON 아님 — 자유 형식으로 파싱 */ }
+
+    // ── 자유 형식 파싱: [그룹명] + 태그 목록
+    const lines = val.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+    let currentGroup = null;
+    let added = 0, skipped = 0;
+
+    lines.forEach(line => {
+      const groupMatch = line.match(/^\[(.+)\]$/);
+      if (groupMatch) {
+        currentGroup = groupMatch[1].trim();
+        // 그룹 없으면 생성
+        const isDefault = TB_DEFAULT_GROUPS.some(g => g.label.toLowerCase() === currentGroup.toLowerCase());
+        if (!isDefault && !gs.config.customGroups.find(g => g.label === currentGroup)) {
+          const id = 'custom_' + currentGroup.toLowerCase().replace(/[^a-z0-9가-힣]/g,'_') + '_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+          gs.config.customGroups.push({ id, label: currentGroup, tags: [] });
+          if (!gs.config.customTags[id]) gs.config.customTags[id] = [];
+        }
+        return;
+      }
+
+      if (!currentGroup || !line) return;
+
+      // 그룹 ID 찾기
+      const defaultGroup = TB_DEFAULT_GROUPS.find(g => g.label.toLowerCase() === currentGroup.toLowerCase());
+      const customGroup  = gs.config.customGroups.find(g => g.label === currentGroup);
+      const groupId      = defaultGroup?.id || customGroup?.id;
+      if (!groupId) return;
+
+      // 중복 체크
+      const fixed    = TB_FIXED[groupId] || [];
+      const deleted  = gs.config.deletedTags?.[groupId] || [];
+      const custom   = gs.config.customTags?.[groupId]  || [];
+      const cg       = gs.config.customGroups?.find(g => g.id === groupId);
+      const existing = [...fixed.filter(t => !deleted.includes(t)), ...(cg?.tags||[]), ...custom];
+
+      if (existing.includes(line)) { skipped++; return; }
+
+      if (!gs.config.customTags[groupId]) gs.config.customTags[groupId] = [];
+      gs.config.customTags[groupId].push(line);
+      added++;
+    });
+
+    if (added === 0 && skipped === 0) { showToast('추가할 태그가 없어요'); return; }
+    if (saveStore) saveStore();
+    showToast(`${added}개 추가, ${skipped}개 중복 건너뜀 ✓`);
+    renderSidebar(); renderTags();
   };
 
   // reset all
@@ -468,7 +517,7 @@ function renderSidebar() {
     const gs2 = window.parent?.__PC_GLOBAL_STORE__;
     if (!gs2) return;
     if (gs2.config.customGroups.find(g => g.label === trimmed)) { showToast('이미 있는 그룹이에요'); return; }
-    const id = 'custom_' + trimmed.toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now();
+    const id = 'custom_' + trimmed.toLowerCase().replace(/[^a-z0-9가-힣]/g, '_') + '_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
     gs2.config.customGroups.push({ id, label: trimmed, tags: [] });
     if (!gs2.config.customTags[id]) gs2.config.customTags[id] = [];
     if (saveStore) saveStore();

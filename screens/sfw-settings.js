@@ -133,26 +133,71 @@ export function render() {
 
   document.getElementById('sfw-menu-import').onclick = () => {
     sfwToggleMenu(false);
-    const val = prompt('JSON을 붙여넣으세요:');
+    const val = prompt('태그를 붙여넣으세요:\n\n[그룹명]\n태그1\n태그2\n\n또는 JSON 형식도 가능해요.');
     if (!val?.trim()) return;
+    const gs2 = window.parent?.__PC_GLOBAL_STORE__;
+    if (!gs2) return;
+
+    // ── JSON 시도
     try {
       const data = JSON.parse(val.trim());
-      if (!data.groups) { showToast('잘못된 형식이에요'); return; }
-      const gs2 = window.parent?.__PC_GLOBAL_STORE__;
-      if (!gs2) return;
-      data.groups.forEach(ig => {
-        const isDefault = SFW_DEFAULT_GROUPS.some(dg => dg.id===ig.id);
-        if (!isDefault) {
-          if (!gs2.config.sfwCustomGroups.find(cg => cg.id===ig.id))
-            gs2.config.sfwCustomGroups.push({ id:ig.id, label:ig.label, tags:ig.tags||[] });
+      if (data.groups && Array.isArray(data.groups)) {
+        data.groups.forEach(ig => {
+          const isDefault = SFW_DEFAULT_GROUPS.some(dg => dg.id===ig.id);
+          if (!isDefault) {
+            if (!gs2.config.sfwCustomGroups.find(cg => cg.id===ig.id))
+              gs2.config.sfwCustomGroups.push({ id:ig.id, label:ig.label, tags:[] });
+          }
+          if (!gs2.config.sfwCustomTags[ig.id]) gs2.config.sfwCustomTags[ig.id]=[];
+          const existing = [...(gs2.config.sfwCustomTags[ig.id]||[])];
+          (ig.tags||[]).forEach(t => { if (!existing.includes(t)) gs2.config.sfwCustomTags[ig.id].push(t); });
+        });
+        if (saveStore) saveStore();
+        showToast('가져오기 완료 ✓');
+        sfwRenderSidebar(); sfwRenderTags();
+        return;
+      }
+    } catch(e) { /* 자유 형식으로 파싱 */ }
+
+    // ── 자유 형식 파싱: [그룹명] + 태그 목록
+    const lines = val.split(/\r?\n/).map(l => l.trim()).filter(l => l);
+    let currentGroup = null;
+    let added = 0, skipped = 0;
+
+    lines.forEach(line => {
+      const groupMatch = line.match(/^\[(.+)\]$/);
+      if (groupMatch) {
+        currentGroup = groupMatch[1].trim();
+        const isDefault = SFW_DEFAULT_GROUPS.some(g => g.label.toLowerCase() === currentGroup.toLowerCase());
+        if (!isDefault && !gs2.config.sfwCustomGroups.find(g => g.label === currentGroup)) {
+          const id = 'sfw_custom_' + currentGroup.replace(/[^a-zA-Z0-9가-힣]/g,'_') + '_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+          gs2.config.sfwCustomGroups.push({ id, label: currentGroup, tags: [] });
+          if (!gs2.config.sfwCustomTags[id]) gs2.config.sfwCustomTags[id] = [];
         }
-        if (!gs2.config.sfwCustomTags[ig.id]) gs2.config.sfwCustomTags[ig.id]=[];
-        (ig.tags||[]).forEach(t => { if (!gs2.config.sfwCustomTags[ig.id].includes(t)) gs2.config.sfwCustomTags[ig.id].push(t); });
-      });
-      if (saveStore) saveStore();
-      showToast('가져오기 완료 ✓');
-      sfwRenderSidebar(); sfwRenderTags();
-    } catch(e) { showToast('JSON 파싱 실패'); }
+        return;
+      }
+      if (!currentGroup || !line) return;
+
+      const defaultGroup = SFW_DEFAULT_GROUPS.find(g => g.label.toLowerCase() === currentGroup.toLowerCase());
+      const customGroup  = gs2.config.sfwCustomGroups.find(g => g.label === currentGroup);
+      const groupId      = defaultGroup?.id || customGroup?.id;
+      if (!groupId) return;
+
+      const deleted  = gs2.config.sfwDeletedTags?.[groupId] || [];
+      const custom   = gs2.config.sfwCustomTags?.[groupId]  || [];
+      const cg       = gs2.config.sfwCustomGroups?.find(g => g.id === groupId);
+      const existing = [...(cg?.tags||[]).filter(t=>!deleted.includes(t)), ...custom];
+
+      if (existing.includes(line)) { skipped++; return; }
+      if (!gs2.config.sfwCustomTags[groupId]) gs2.config.sfwCustomTags[groupId] = [];
+      gs2.config.sfwCustomTags[groupId].push(line);
+      added++;
+    });
+
+    if (added === 0 && skipped === 0) { showToast('추가할 태그가 없어요'); return; }
+    if (saveStore) saveStore();
+    showToast(`${added}개 추가, ${skipped}개 중복 건너뜀 ✓`);
+    sfwRenderSidebar(); sfwRenderTags();
   };
 
   document.getElementById('sfw-menu-reset').onclick = () => {
