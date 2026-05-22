@@ -15,7 +15,7 @@ export function render() {
     const s = document.createElement('style');
     s.id = 'pf-style';
     s.textContent = `
-.pf-textarea{width:100%;padding:0;border:none;background:transparent;color:var(--text-primary);font-size:15px;font-family:inherit;resize:none;outline:none;line-height:1.7;}
+.pf-textarea{width:100%;padding:0;border:none;background:transparent;color:var(--text-primary);font-size:15px;font-family:inherit;resize:none;outline:none;line-height:1.7;pointer-events:auto;user-select:text;-webkit-user-select:text;cursor:text;}
 .pf-textarea::placeholder{color:var(--text-hint);font-size:14px;}
 .pf-section-label{font-size:11px;font-weight:600;letter-spacing:0.8px;color:var(--text-muted);text-transform:uppercase;padding:14px 16px 4px;display:flex;align-items:center;justify-content:space-between;}
 .pf-inject-badge{font-size:10px;font-weight:500;letter-spacing:0;text-transform:none;color:var(--text-hint);background:var(--btn-idle);border-radius:6px;padding:2px 7px;}
@@ -36,7 +36,7 @@ export function render() {
           <span>Body &amp; Appearance</span>
           <span class="pf-inject-badge">항상 적용</span>
         </div>
-        <div class="list-row" style="flex-direction:column;align-items:flex-start;gap:8px;padding:10px 16px 14px;">
+        <div class="list-row" style="flex-direction:column;align-items:flex-start;gap:8px;padding:10px 16px 14px;cursor:text;">
           <textarea class="pf-textarea" id="pf-userBody" rows="5"
             placeholder="키, 체형, 피부, 머리카락, 눈에 띄는 특징 등&#10;예: 슬림한 체형, 긴 갈색 머리, 쇄골 아래 작은 점">${escTA(store.userBody || '')}${escTA(store.userMarks ? (store.userBody ? '\n' + store.userMarks : store.userMarks) : '')}</textarea>
         </div>
@@ -46,7 +46,7 @@ export function render() {
           <span>Sexual</span>
           <span class="pf-inject-badge">성적 씬에서만 적용</span>
         </div>
-        <div class="list-row" style="flex-direction:column;align-items:flex-start;gap:8px;padding:10px 16px 14px;">
+        <div class="list-row" style="flex-direction:column;align-items:flex-start;gap:8px;padding:10px 16px 14px;cursor:text;">
           <textarea class="pf-textarea" id="pf-userSexual" rows="4"
             placeholder="성감대, 반응 패턴, 특이사항 등&#10;예: 귀와 목이 예민함, 자극에 빠르게 반응">${escTA(store.userErogenous || '')}</textarea>
         </div>
@@ -60,7 +60,7 @@ export function render() {
           <span>Body &amp; Appearance</span>
           <span class="pf-inject-badge">항상 적용</span>
         </div>
-        <div class="list-row" style="flex-direction:column;align-items:flex-start;gap:8px;padding:10px 16px 14px;">
+        <div class="list-row" style="flex-direction:column;align-items:flex-start;gap:8px;padding:10px 16px 14px;cursor:text;">
           <textarea class="pf-textarea" id="pf-charBody" rows="5"
             placeholder="키, 체형, 외형적 특징 등&#10;예: 넓은 어깨, 근육질 체형, 왼쪽 어깨 흉터">${escTA(store.charBody || '')}${escTA(store.charMarks ? (store.charBody ? '\n' + store.charMarks : store.charMarks) : '')}</textarea>
         </div>
@@ -70,7 +70,7 @@ export function render() {
           <span>Sexual</span>
           <span class="pf-inject-badge">성적 씬에서만 적용</span>
         </div>
-        <div class="list-row" style="flex-direction:column;align-items:flex-start;gap:8px;padding:10px 16px 14px;">
+        <div class="list-row" style="flex-direction:column;align-items:flex-start;gap:8px;padding:10px 16px 14px;cursor:text;">
           <textarea class="pf-textarea" id="pf-charSexual" rows="4"
             placeholder="성감대, 반응 패턴, 특이사항 등&#10;예: 귀 뒤쪽과 목덜미 예민함, 낮고 조용한 신음">${escTA(store.charErogenous || '')}</textarea>
         </div>
