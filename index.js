@@ -110,7 +110,7 @@ function refreshPrompt() {
   try {
     const { setExtensionPrompt } = ctx();
     setExtensionPrompt(MODULE_NAME,          buildMainPrompt(), 3, 0);
-    setExtensionPrompt(MODULE_NAME + '_sex', buildSexPrompt(),  1, 2);
+    setExtensionPrompt(MODULE_NAME + '_sex', buildSexPrompt(),  1, 0);
   } catch(e) { console.warn(`[${MODULE_NAME}] prompt error`, e); }
 }
 
