@@ -216,7 +216,9 @@ function getVisibleTags(groupId) {
   const custom    = isNsfw() ? (store.config.customTags?.[groupId]||[])     : (store.config.sfwCustomTags?.[groupId]||[]);
   const cg        = isNsfw() ? (store.config.customGroups||[]).find(g => g.id===groupId) : (store.config.sfwCustomGroups||[]).find(g => g.id===groupId);
   const base      = isDefault ? fixed.filter(t => !deleted.includes(t)) : (cg?.tags||[]);
-  return [...base, ...custom];
+  // deduplicate: custom tags that already exist in base are skipped
+  const customFiltered = custom.filter(t => !base.includes(t));
+  return [...base, ...customFiltered];
 }
 
 function getRecentCombos() { const s=getStore(); return isNsfw() ? (s.config.recentCombos||[]) : (s.config.sfwRecentCombos||[]); }
@@ -284,7 +286,7 @@ function injectToolbarStyle() {
 .pc-tb-add-input{padding:6px 13px;border-radius:20px;font-size:13px;background:#fff;color:#1a1a1a;border:1px solid #e0e0e6;outline:none;font-family:inherit;width:110px;}
 .pc-tb-add-input::placeholder{color:#bbb;}
 .pc-tb-add-input:focus{border-color:#aaa;}
-.pc-tb-mini-popup{display:none;padding:3px 6px;background:#fff;border:1px solid #e0e0e0;border-radius:20px;box-shadow:0 2px 8px rgba(0,0,0,0.1);gap:3px;align-items:center;}
+.pc-tb-mini-popup{display:none;padding:3px 6px;background:#fff;border:1px solid #e0e0e0;border-radius:20px;box-shadow:0 2px 8px rgba(0,0,0,0.1);gap:3px;align-items:center;vertical-align:middle;}
 .pc-tb-mini-popup.show{display:inline-flex;}
 .pc-tb-mini-role{padding:4px 10px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid #e0e0e0;background:#f0f0f4;color:#555;cursor:pointer;font-family:inherit;transition:all .1s;white-space:nowrap;}
 .pc-tb-mini-role:hover{background:#1a1a1a;color:#fff;border-color:#1a1a1a;}
@@ -608,15 +610,24 @@ function pcDeleteTag(tag) {
 
 function pcShowMiniPopup(el, tag, group) {
   pcHideMiniPopup();
-  const popup=document.createElement('div'); popup.id='pc-tb-mini-popup'; popup.className='pc-tb-mini-popup show';
-  ROLE_OPTIONS.forEach(r=>{
-    const btn=document.createElement('button'); btn.className='pc-tb-mini-role'; btn.textContent=r.label;
-    btn.onclick=(ev)=>{ ev.stopPropagation(); tbSelected.push({tag,group,role:r.id,roleLabel:r.label}); pcHideMiniPopup(); renderToolbarTags(); renderToolbarSelected(); };
+  const popup = document.createElement('div');
+  popup.id = 'pc-tb-mini-popup';
+  popup.className = 'pc-tb-mini-popup show';
+  ROLE_OPTIONS.forEach(r => {
+    const btn = document.createElement('button');
+    btn.className = 'pc-tb-mini-role';
+    btn.textContent = r.label;
+    btn.onclick = (ev) => {
+      ev.stopPropagation();
+      tbSelected.push({ tag, group, role: r.id, roleLabel: r.label });
+      pcHideMiniPopup();
+      renderToolbarTags();
+      renderToolbarSelected();
+    };
     popup.appendChild(btn);
   });
-  const rect=el.getBoundingClientRect();
-  popup.style.cssText=`position:fixed;top:${rect.bottom+4}px;left:${rect.left}px;z-index:99999;`;
-  document.body.appendChild(popup);
+  // insert inline after the tag element instead of fixed to body
+  el.insertAdjacentElement('afterend', popup);
 }
 
 function pcHideMiniPopup() { document.getElementById('pc-tb-mini-popup')?.remove(); tbPendingTag=null; }
@@ -674,7 +685,16 @@ function renderToolbar() {
   if (toolbar) ['touchstart','touchmove','touchend'].forEach(evt=>toolbar.addEventListener(evt,e=>e.stopPropagation(),{passive:false}));
 }
 
-function pcDocClick(e) { const p=document.getElementById('pc-tb-mini-popup'); if(!p) return; if(!p.contains(e.target)&&!e.target.classList.contains('pc-tb-tag')) pcHideMiniPopup(); }
+function pcDocClick(e) {
+  const p = document.getElementById('pc-tb-mini-popup');
+  if (!p) return;
+  if (
+    !p.contains(e.target) &&
+    !e.target.classList.contains('pc-tb-tag') &&
+    !e.target.classList.contains('pc-tb-tab') &&
+    !e.target.closest?.('.pc-tb-tab')
+  ) pcHideMiniPopup();
+}
 function removeToolbar() { document.getElementById(TOOLBAR_ID)?.remove(); document.removeEventListener('click',pcDocClick); }
 
 window.pcTbToggleEdit = function() {
@@ -691,9 +711,10 @@ window.pcTbCollapse = function() {
 };
 
 window.pcSwitchTab = function(groupId) {
-  tbActiveGroup=groupId;
-  document.querySelectorAll('.pc-tb-tab').forEach(t=>t.classList.toggle('active',t.dataset.gid===groupId));
-  pcHideMiniPopup(); renderToolbarTags();
+  pcHideMiniPopup();
+  tbActiveGroup = groupId;
+  document.querySelectorAll('.pc-tb-tab').forEach(t => t.classList.toggle('active', t.dataset.gid === groupId));
+  setTimeout(() => renderToolbarTags(), 0);
 };
 
 window.pcCondom = function() {
