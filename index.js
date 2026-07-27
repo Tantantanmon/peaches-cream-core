@@ -30,6 +30,8 @@ const defaultGlobalConfig = {
   deletedTags:{}, deletedGroups:[], customGroups:[],
   favoriteTags:[], favoriteTabEnabled:false, tbGroupOrder:[],
   condomState:'',
+  soundMode: false,
+  sceneMode: '',
   recentCombos:[], savedCombos:[],
   // SFW
   sfwCustomTags:{}, sfwDeletedTags:{}, sfwDeletedGroups:[], sfwCustomGroups:[],
@@ -58,6 +60,8 @@ function getStore() {
   if (!s.config.tbGroupOrder)  s.config.tbGroupOrder  = [];
   if (!s.config.recentCombos)  s.config.recentCombos  = [];
   if (!s.config.savedCombos)   s.config.savedCombos   = [];
+  if (s.config.soundMode === undefined) s.config.soundMode = false;
+  if (s.config.sceneMode === undefined) s.config.sceneMode = '';
   // SFW
   if (!s.config.sfwCustomTags)    s.config.sfwCustomTags    = {};
   if (!s.config.sfwDeletedTags)   s.config.sfwDeletedTags   = {};
@@ -111,7 +115,51 @@ function refreshPrompt() {
     const { setExtensionPrompt } = ctx();
     setExtensionPrompt(MODULE_NAME,          buildMainPrompt(), 3, 0);
     setExtensionPrompt(MODULE_NAME + '_sex', buildSexPrompt(),  1, 0);
+    refreshModePrompt();
   } catch(e) { console.warn(`[${MODULE_NAME}] prompt error`, e); }
+}
+
+function buildSoundPrompt() {
+  return `[SOUND DIRECTION]
+Include vivid auditory immersion throughout the scene:
+- Character and user moans must be expressed naturally as dialogue ("...") in their own voice and tone.
+- Moans should vary in intensity according to stimulation — from soft sighs to uncontrolled cries.
+- **Wet sounds, skin contact sounds, and breathing** must be woven organically into action descriptions — not as separate paragraphs, but embedded within the flow of the scene.`;
+}
+
+function buildScenePrompt(mode) {
+  if (mode === 'hardcore') return `[SCENE MODE: HARDCORE]
+성적 묘사는 극도로 노골적이고 원초적이며 거칠게 서술하라.
+감정적 여과 없이 육체적 쾌락과 자극에만 집중하라.
+대사는 저속하고 직접적이며 지배적인 톤을 유지하라.
+행위는 강도 높게, 신체 반응은 민감하고 과장 없이 사실적으로 묘사하라.
+품위나 낭만은 배제하고, 본능과 욕망에 충실한 씬을 전개하라.`;
+
+  if (mode === 'vanilla') return `[SCENE MODE: VANILLA]
+성적 묘사는 따뜻하고 다정하며 감정이 풍부하게 서술하라.
+신체적 자극보다 두 사람 사이의 감정적 교류와 친밀감을 중심에 두라.
+대사는 부드럽고 애정이 담기며, 행위 하나하나에 사랑과 배려가 느껴지게 하라.
+빠르고 격렬한 전개보다 천천히 쌓아가는 온도감 있는 씬을 유지하라.`;
+
+  if (mode === 'erotic') return `[SCENE MODE: EROTIC]
+실제 성행위는 일어나지 않는다. 그러나 성적 긴장감은 끊임없이 유지되어야 한다.
+시선, 호흡, 손끝의 스침, 목소리의 떨림 등 미세한 신체 반응으로 욕망을 암시하라.
+대사는 이중적 의미를 품거나, 직접적으로 말하지 않지만 분명히 느껴지는 텐션을 담으라.
+독자가 다음 장면을 상상하게 만드는 여운과 갈증을 의도적으로 남겨라.
+절제된 묘사 속에서 성적 에너지가 폭발 직전인 상태를 유지하라.`;
+
+  return '';
+}
+
+function refreshModePrompt() {
+  try {
+    const { setExtensionPrompt } = ctx();
+    const store = getStore();
+    const soundPrompt = store.config.soundMode ? buildSoundPrompt() : '';
+    const scenePrompt = store.config.sceneMode ? buildScenePrompt(store.config.sceneMode) : '';
+    setExtensionPrompt(MODULE_NAME + '_sound', soundPrompt, 1, 0);
+    setExtensionPrompt(MODULE_NAME + '_scene', scenePrompt, 1, 0);
+  } catch(e) { console.warn(`[${MODULE_NAME}] mode prompt error`, e); }
 }
 
 function getCurrentCharName() { try { return ctx().name2 || '{{char}}'; } catch(e) { return '{{char}}'; } }
@@ -216,8 +264,7 @@ function getVisibleTags(groupId) {
   const custom    = isNsfw() ? (store.config.customTags?.[groupId]||[])     : (store.config.sfwCustomTags?.[groupId]||[]);
   const cg        = isNsfw() ? (store.config.customGroups||[]).find(g => g.id===groupId) : (store.config.sfwCustomGroups||[]).find(g => g.id===groupId);
   const base      = isDefault ? fixed.filter(t => !deleted.includes(t)) : (cg?.tags||[]);
-  const customFiltered = custom.filter(t => !base.includes(t));
-  return [...base, ...customFiltered];
+  return [...base, ...custom];
 }
 
 function getRecentCombos() { const s=getStore(); return isNsfw() ? (s.config.recentCombos||[]) : (s.config.sfwRecentCombos||[]); }
@@ -257,6 +304,19 @@ function injectToolbarStyle() {
 .pc-tb-icon-btn.edit-on{color:#1a1a1a;font-weight:600;}
 .pc-tb-condom{padding:5px 12px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid #d8d8d8;background:transparent;color:#555;cursor:pointer;transition:all .12s;font-family:inherit;flex-shrink:0;white-space:nowrap;}
 .pc-tb-condom.active{background:#1d4ed8;color:#fff;border-color:#1d4ed8;}
+.pc-tb-mode-btn{padding:4px 9px;border-radius:20px;font-size:15px;border:1px solid #d8d8d8;background:transparent;cursor:pointer;transition:all .12s;font-family:inherit;flex-shrink:0;opacity:0.45;line-height:1.2;}
+.pc-tb-mode-btn:hover{opacity:0.7;}
+.pc-tb-mode-btn.active{opacity:1;border-color:transparent;background:rgba(0,0,0,0.08);}
+.pc-tb-mode-btn.active-sound{background:#e8f4f0;border-color:#5baa8a;}
+.pc-tb-mode-btn.active-hardcore{background:#fde8e8;border-color:#e05050;}
+.pc-tb-mode-btn.active-vanilla{background:#fde8f4;border-color:#d070a0;}
+.pc-tb-mode-btn.active-erotic{background:#f0e8fd;border-color:#9070d0;}
+@media(prefers-color-scheme:dark){
+.pc-tb-mode-btn.active-sound{background:#1a3a30;border-color:#5baa8a;}
+.pc-tb-mode-btn.active-hardcore{background:#3a1a1a;border-color:#e05050;}
+.pc-tb-mode-btn.active-vanilla{background:#3a1a2a;border-color:#d070a0;}
+.pc-tb-mode-btn.active-erotic{background:#2a1a3a;border-color:#9070d0;}
+}
 .pc-tb-collapsible.hidden{display:none;}
 .pc-tb-tabs{display:flex;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid #ddd;padding:0 12px;gap:2px;}
 .pc-tb-tabs::-webkit-scrollbar{display:none;}
@@ -285,7 +345,7 @@ function injectToolbarStyle() {
 .pc-tb-add-input{padding:6px 13px;border-radius:20px;font-size:13px;background:#fff;color:#1a1a1a;border:1px solid #e0e0e6;outline:none;font-family:inherit;width:110px;}
 .pc-tb-add-input::placeholder{color:#bbb;}
 .pc-tb-add-input:focus{border-color:#aaa;}
-.pc-tb-mini-popup{display:none;padding:3px 6px;background:#fff;border:1px solid #e0e0e0;border-radius:20px;box-shadow:0 2px 8px rgba(0,0,0,0.1);gap:3px;align-items:center;vertical-align:middle;}
+.pc-tb-mini-popup{display:none;padding:3px 6px;background:#fff;border:1px solid #e0e0e0;border-radius:20px;box-shadow:0 2px 8px rgba(0,0,0,0.1);gap:3px;align-items:center;}
 .pc-tb-mini-popup.show{display:inline-flex;}
 .pc-tb-mini-role{padding:4px 10px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid #e0e0e0;background:#f0f0f4;color:#555;cursor:pointer;font-family:inherit;transition:all .1s;white-space:nowrap;}
 .pc-tb-mini-role:hover{background:#1a1a1a;color:#fff;border-color:#1a1a1a;}
@@ -372,7 +432,11 @@ function buildToolbarHTML() {
   ).join('');
 
   const condomBtn = isNsfw()
-    ? `<button class="pc-tb-condom${condomActive?' active':''}" onclick="pcCondom()">${condomActive?'Condom ON':'Condom'}</button>`
+    ? `<button class="pc-tb-condom${condomActive?' active':''}" onclick="pcCondom()">${condomActive?'Condom ON':'Condom'}</button>
+       <button class="pc-tb-mode-btn${store.config.soundMode?' active active-sound':''}" onclick="pcToggleSound()" title="Sound">🔊</button>
+       <button class="pc-tb-mode-btn${store.config.sceneMode==='hardcore'?' active active-hardcore':''}" onclick="pcToggleScene('hardcore')" title="Hardcore">🔥</button>
+       <button class="pc-tb-mode-btn${store.config.sceneMode==='vanilla'?' active active-vanilla':''}" onclick="pcToggleScene('vanilla')" title="Vanilla">🌸</button>
+       <button class="pc-tb-mode-btn${store.config.sceneMode==='erotic'?' active active-erotic':''}" onclick="pcToggleScene('erotic')" title="Erotic">💋</button>`
     : '';
 
   return `
@@ -583,10 +647,8 @@ function renderToolbarTags() {
     if (e.key==='Enter') {
       e.preventDefault(); const val=addInput.value.trim(); if(!val) return;
       const s=getStore();
-      // check full visible tag list to prevent any duplicate
-      if (getVisibleTags(tbActiveGroup).includes(val)) { addInput.value=''; return; }
-      if (isNsfw()) { if(!s.config.customTags[tbActiveGroup]) s.config.customTags[tbActiveGroup]=[]; s.config.customTags[tbActiveGroup].push(val); }
-      else          { if(!s.config.sfwCustomTags[tbActiveGroup]) s.config.sfwCustomTags[tbActiveGroup]=[]; s.config.sfwCustomTags[tbActiveGroup].push(val); }
+      if (isNsfw()) { if(!s.config.customTags[tbActiveGroup]) s.config.customTags[tbActiveGroup]=[]; if(!s.config.customTags[tbActiveGroup].includes(val)&&!getFixedTags(tbActiveGroup).includes(val)) s.config.customTags[tbActiveGroup].push(val); }
+      else          { if(!s.config.sfwCustomTags[tbActiveGroup]) s.config.sfwCustomTags[tbActiveGroup]=[]; if(!s.config.sfwCustomTags[tbActiveGroup].includes(val)&&!getFixedTags(tbActiveGroup).includes(val)) s.config.sfwCustomTags[tbActiveGroup].push(val); }
       saveStore(); addInput.value=''; renderToolbarTags();
     }
   };
@@ -617,8 +679,9 @@ function pcShowMiniPopup(el, tag, group) {
     btn.onclick=(ev)=>{ ev.stopPropagation(); tbSelected.push({tag,group,role:r.id,roleLabel:r.label}); pcHideMiniPopup(); renderToolbarTags(); renderToolbarSelected(); };
     popup.appendChild(btn);
   });
-  // inline after tag element — works on mobile, no fixed positioning issues
-  el.insertAdjacentElement('afterend', popup);
+  const rect=el.getBoundingClientRect();
+  popup.style.cssText=`position:fixed;top:${rect.bottom+4}px;left:${rect.left}px;z-index:99999;`;
+  document.body.appendChild(popup);
 }
 
 function pcHideMiniPopup() { document.getElementById('pc-tb-mini-popup')?.remove(); tbPendingTag=null; }
@@ -676,16 +739,7 @@ function renderToolbar() {
   if (toolbar) ['touchstart','touchmove','touchend'].forEach(evt=>toolbar.addEventListener(evt,e=>e.stopPropagation(),{passive:false}));
 }
 
-function pcDocClick(e) {
-  const p = document.getElementById('pc-tb-mini-popup');
-  if (!p) return;
-  if (
-    !p.contains(e.target) &&
-    !e.target.classList.contains('pc-tb-tag') &&
-    !e.target.classList.contains('pc-tb-tab') &&
-    !e.target.closest?.('.pc-tb-tab')
-  ) pcHideMiniPopup();
-}
+function pcDocClick(e) { const p=document.getElementById('pc-tb-mini-popup'); if(!p) return; if(!p.contains(e.target)&&!e.target.classList.contains('pc-tb-tag')) pcHideMiniPopup(); }
 function removeToolbar() { document.getElementById(TOOLBAR_ID)?.remove(); document.removeEventListener('click',pcDocClick); }
 
 window.pcTbToggleEdit = function() {
@@ -702,16 +756,41 @@ window.pcTbCollapse = function() {
 };
 
 window.pcSwitchTab = function(groupId) {
-  pcHideMiniPopup();
-  tbActiveGroup = groupId;
-  document.querySelectorAll('.pc-tb-tab').forEach(t => t.classList.toggle('active', t.dataset.gid === groupId));
-  setTimeout(() => renderToolbarTags(), 0);
+  tbActiveGroup=groupId;
+  document.querySelectorAll('.pc-tb-tab').forEach(t=>t.classList.toggle('active',t.dataset.gid===groupId));
+  pcHideMiniPopup(); renderToolbarTags();
 };
 
 window.pcCondom = function() {
   const store=getStore(); store.config.condomState=store.config.condomState==='on'?'':'on'; saveStore();
   const btn=document.querySelector('.pc-tb-condom');
   if(btn){ const on=store.config.condomState==='on'; btn.classList.toggle('active',on); btn.textContent=on?'Condom ON':'Condom'; }
+};
+
+window.pcToggleSound = function() {
+  const store = getStore();
+  store.config.soundMode = !store.config.soundMode;
+  saveStore();
+  refreshModePrompt();
+  const btn = document.querySelector('.pc-tb-mode-btn[title="Sound"]');
+  if (btn) {
+    btn.classList.toggle('active', store.config.soundMode);
+    btn.classList.toggle('active-sound', store.config.soundMode);
+  }
+};
+
+window.pcToggleScene = function(mode) {
+  const store = getStore();
+  store.config.sceneMode = store.config.sceneMode === mode ? '' : mode;
+  saveStore();
+  refreshModePrompt();
+  // 라디오 버튼 방식 — 세 버튼 상태 동기화
+  ['hardcore','vanilla','erotic'].forEach(m => {
+    const btn = document.querySelector(`.pc-tb-mode-btn[title="${m.charAt(0).toUpperCase()+m.slice(1)}"]`);
+    if (!btn) return;
+    const isOn = store.config.sceneMode === m;
+    btn.className = `pc-tb-mode-btn${isOn ? ` active active-${m}` : ''}`;
+  });
 };
 
 window.pcTbReset = function() {
