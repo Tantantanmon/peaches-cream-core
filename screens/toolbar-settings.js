@@ -206,7 +206,7 @@ export function render() {
   document.getElementById('tbs-menu-export').onclick = () => {
     tbsToggleMenu(false);
     const gs = window.parent?.__PC_GLOBAL_STORE__;
-    if (!gs) return;
+    if (!gs) { showToast('스토어를 불러올 수 없어요'); return; }
     const groups = getOrderedGroups(gs);
     const exportData = {
       groups: groups.map(g => {
@@ -216,16 +216,39 @@ export function render() {
         const custom = gs.config.customTags?.[g.id] || [];
         const customGroup = gs.config.customGroups?.find(cg => cg.id === g.id);
         const base = isDefault ? fixed.filter(t => !deleted.includes(t)) : (customGroup?.tags || []);
-        return { id: g.id, label: g.label, tags: [...base, ...custom] };
+        const customFiltered = custom.filter(t => !base.includes(t));
+        return { id: g.id, label: g.label, tags: [...base, ...customFiltered] };
       }),
       favoriteTags: gs.config.favoriteTags || []
     };
     const json = JSON.stringify(exportData, null, 2);
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(json).then(() => showToast('클립보드에 복사됨 ✓')).catch(() => showToast('복사 실패'));
-    } else {
-      showToast('복사 실패');
-    }
+
+    const doCopy = async () => {
+      // method 1: modern clipboard API
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+          await navigator.clipboard.writeText(json);
+          showToast('클립보드에 복사됨 ✓');
+          return;
+        } catch(e) { /* fall through */ }
+      }
+      // method 2: execCommand (SillyTavern iframe 호환)
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = json;
+        ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ok = document.execCommand('copy');
+        document.body.removeChild(ta);
+        if (ok) { showToast('클립보드에 복사됨 ✓'); return; }
+      } catch(e) { /* fall through */ }
+      // method 3: prompt 폴백 (수동 복사)
+      prompt('아래 JSON을 복사하세요 (Ctrl+A → Ctrl+C):', json);
+    };
+
+    doCopy();
   };
 
   // import
@@ -643,7 +666,9 @@ function renderTags() {
         e.preventDefault();
         const val = addInput.value.trim();
         if (!val) return;
-        if (allTags.includes(val)) { showToast('이미 있는 태그예요'); return; }
+        // check full visible tags (base + custom) to prevent any duplicate
+        const fullTags = [...baseTags, ...custom];
+        if (fullTags.includes(val)) { showToast('이미 있는 태그예요'); addInput.value = ''; return; }
         if (!gs.config.customTags[tbsActiveGroup]) gs.config.customTags[tbsActiveGroup] = [];
         gs.config.customTags[tbsActiveGroup].push(val);
         if (saveStore) saveStore();
