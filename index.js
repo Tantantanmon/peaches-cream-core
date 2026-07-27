@@ -216,7 +216,6 @@ function getVisibleTags(groupId) {
   const custom    = isNsfw() ? (store.config.customTags?.[groupId]||[])     : (store.config.sfwCustomTags?.[groupId]||[]);
   const cg        = isNsfw() ? (store.config.customGroups||[]).find(g => g.id===groupId) : (store.config.sfwCustomGroups||[]).find(g => g.id===groupId);
   const base      = isDefault ? fixed.filter(t => !deleted.includes(t)) : (cg?.tags||[]);
-  // deduplicate: custom tags that already exist in base are skipped
   const customFiltered = custom.filter(t => !base.includes(t));
   return [...base, ...customFiltered];
 }
@@ -584,8 +583,10 @@ function renderToolbarTags() {
     if (e.key==='Enter') {
       e.preventDefault(); const val=addInput.value.trim(); if(!val) return;
       const s=getStore();
-      if (isNsfw()) { if(!s.config.customTags[tbActiveGroup]) s.config.customTags[tbActiveGroup]=[]; if(!s.config.customTags[tbActiveGroup].includes(val)&&!getFixedTags(tbActiveGroup).includes(val)) s.config.customTags[tbActiveGroup].push(val); }
-      else          { if(!s.config.sfwCustomTags[tbActiveGroup]) s.config.sfwCustomTags[tbActiveGroup]=[]; if(!s.config.sfwCustomTags[tbActiveGroup].includes(val)&&!getFixedTags(tbActiveGroup).includes(val)) s.config.sfwCustomTags[tbActiveGroup].push(val); }
+      // check full visible tag list to prevent any duplicate
+      if (getVisibleTags(tbActiveGroup).includes(val)) { addInput.value=''; return; }
+      if (isNsfw()) { if(!s.config.customTags[tbActiveGroup]) s.config.customTags[tbActiveGroup]=[]; s.config.customTags[tbActiveGroup].push(val); }
+      else          { if(!s.config.sfwCustomTags[tbActiveGroup]) s.config.sfwCustomTags[tbActiveGroup]=[]; s.config.sfwCustomTags[tbActiveGroup].push(val); }
       saveStore(); addInput.value=''; renderToolbarTags();
     }
   };
@@ -610,23 +611,13 @@ function pcDeleteTag(tag) {
 
 function pcShowMiniPopup(el, tag, group) {
   pcHideMiniPopup();
-  const popup = document.createElement('div');
-  popup.id = 'pc-tb-mini-popup';
-  popup.className = 'pc-tb-mini-popup show';
-  ROLE_OPTIONS.forEach(r => {
-    const btn = document.createElement('button');
-    btn.className = 'pc-tb-mini-role';
-    btn.textContent = r.label;
-    btn.onclick = (ev) => {
-      ev.stopPropagation();
-      tbSelected.push({ tag, group, role: r.id, roleLabel: r.label });
-      pcHideMiniPopup();
-      renderToolbarTags();
-      renderToolbarSelected();
-    };
+  const popup=document.createElement('div'); popup.id='pc-tb-mini-popup'; popup.className='pc-tb-mini-popup show';
+  ROLE_OPTIONS.forEach(r=>{
+    const btn=document.createElement('button'); btn.className='pc-tb-mini-role'; btn.textContent=r.label;
+    btn.onclick=(ev)=>{ ev.stopPropagation(); tbSelected.push({tag,group,role:r.id,roleLabel:r.label}); pcHideMiniPopup(); renderToolbarTags(); renderToolbarSelected(); };
     popup.appendChild(btn);
   });
-  // insert inline after the tag element instead of fixed to body
+  // inline after tag element — works on mobile, no fixed positioning issues
   el.insertAdjacentElement('afterend', popup);
 }
 
