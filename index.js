@@ -20,6 +20,7 @@ function getCharKey() {
 const defaultCharData = {
   userBody:'', userMarks:'', userErogenous:'',
   charBody:'', charMarks:'', charErogenous:'',
+  directiveEnabled:false, directiveText:'',
 };
 
 const defaultGlobalConfig = {
@@ -121,10 +122,10 @@ function refreshPrompt() {
 
 function buildSoundPrompt() {
   return `[SOUND DIRECTION]
-Include vivid auditory immersion throughout the scene:
-- Character and user moans must be expressed naturally as dialogue ("...") in their own voice and tone.
-- Moans should vary in intensity according to stimulation — from soft sighs to uncontrolled cries.
-- **Wet sounds, skin contact sounds, and breathing** must be woven organically into action descriptions — not as separate paragraphs, but embedded within the flow of the scene.`;
+씬 진행 중 청각적 디테일을 자연스럽게 녹여라.
+- User와 CHAR 각자의 신음은 "" 안 대사로, 각자의 말투/성격에 맞게 표현하라. 과장된 비명이나 반복적인 의성어 남발 금지 — 자극 강도에 비례해서만 자연스럽게 오르내리게 하라.
+- 젖은 소리(질척임), 살 부딪히는 소리, 숨소리 같은 의성어는 지문(행동 묘사) 안에 자연스럽게 섞어라. 별도 문단으로 나열하거나 매 문장마다 넣지 말 것.
+- 과도하거나 만화적인 표현(예: 지나친 느낌표, 반복 의성어 나열)은 피하고, 서사 흐름을 해치지 않는 선에서만 사용하라.`;
 }
 
 function buildScenePrompt(mode) {
@@ -143,7 +144,8 @@ function buildScenePrompt(mode) {
 
   if (mode === 'erotic') return `[SCENE MODE: EROTIC]
 실제 성행위는 일어나지 않는다. 그러나 성적 긴장감은 끊임없이 유지되어야 한다.
-시선, 호흡, 손끝의 스침, 목소리의 떨림 등 미세한 신체 반응으로 욕망을 암시하라.
+의도치 않은 가벼운 신체 접촉은 허용된다 — 손등이 스치거나, 손가락 끝이 우연히 닿거나, 서로의 입술을 순간 훔쳐보는 시선 같은 정도. 접촉 자체는 성적이지 않아도 무방하다 — 오히려 사소하고 우연해 보일수록, 그 순간에 서린 성적 긴장감이 은근하게 묻어나도록 묘사하라.
+시선, 호흡, 목소리의 떨림 등 미세한 신체 반응으로 욕망을 암시하라.
 대사는 이중적 의미를 품거나, 직접적으로 말하지 않지만 분명히 느껴지는 텐션을 담으라.
 독자가 다음 장면을 상상하게 만드는 여운과 갈증을 의도적으로 남겨라.
 절제된 묘사 속에서 성적 에너지가 폭발 직전인 상태를 유지하라.`;
@@ -151,14 +153,22 @@ function buildScenePrompt(mode) {
   return '';
 }
 
+function buildDirectivePrompt() {
+  const cd = getCharStore();
+  if (!cd.directiveEnabled || !cd.directiveText) return '';
+  return `[PERSISTENT DIRECTION]\n아래 지시를 이 지시가 해제되기 전까지 롤플레이 전반에 계속 반영하라:\n"${cd.directiveText}"`;
+}
+
 function refreshModePrompt() {
   try {
     const { setExtensionPrompt } = ctx();
     const store = getStore();
-    const soundPrompt = store.config.soundMode ? buildSoundPrompt() : '';
-    const scenePrompt = store.config.sceneMode ? buildScenePrompt(store.config.sceneMode) : '';
+    const soundPrompt     = store.config.soundMode ? buildSoundPrompt() : '';
+    const scenePrompt     = store.config.sceneMode ? buildScenePrompt(store.config.sceneMode) : '';
+    const directivePrompt = buildDirectivePrompt();
     setExtensionPrompt(MODULE_NAME + '_sound', soundPrompt, 1, 0);
     setExtensionPrompt(MODULE_NAME + '_scene', scenePrompt, 1, 0);
+    setExtensionPrompt(MODULE_NAME + '_directive', directivePrompt, 1, 0);
   } catch(e) { console.warn(`[${MODULE_NAME}] mode prompt error`, e); }
 }
 
@@ -231,6 +241,14 @@ const ROLE_OPTIONS = [
   {id:'c',label:'C'},{id:'u',label:'U'},{id:'none',label:'없음'},
 ];
 
+// ── 시간점프 (1회성 토글) ──
+const TIME_JUMP_LABELS = { hours:'몇시간 뒤', day:'하루 뒤', weeks:'몇주 뒤' };
+const TIME_JUMP_TEXT   = {
+  hours: 'A few hours have passed since the last scene.',
+  day:   'A full day has passed since the last scene.',
+  weeks: 'A few weeks have passed since the last scene.',
+};
+
 // ── 모드 상태 ──
 let tbMode        = 'nsfw'; // 'nsfw' | 'sfw'
 let tbCollapsed   = false;
@@ -238,6 +256,7 @@ let tbEditMode    = false;
 let tbActiveGroup = 'sfw';
 let tbSelected    = [];
 let tbPendingTag  = null;
+let tbTimeJump    = null; // null | 'hours' | 'day' | 'weeks' — 1회성, Apply 시 소모
 let dragSrc = null, dragSrcIdx = null;
 
 // ── 모드별 데이터 접근 헬퍼 ──
@@ -311,11 +330,13 @@ function injectToolbarStyle() {
 .pc-tb-mode-btn.active-hardcore{background:#fde8e8;border-color:#e05050;}
 .pc-tb-mode-btn.active-vanilla{background:#fde8f4;border-color:#d070a0;}
 .pc-tb-mode-btn.active-erotic{background:#f0e8fd;border-color:#9070d0;}
+.pc-tb-mode-btn.active-timejump{background:#e8f0fd;border-color:#5090d0;}
 @media(prefers-color-scheme:dark){
 .pc-tb-mode-btn.active-sound{background:#1a3a30;border-color:#5baa8a;}
 .pc-tb-mode-btn.active-hardcore{background:#3a1a1a;border-color:#e05050;}
 .pc-tb-mode-btn.active-vanilla{background:#3a1a2a;border-color:#d070a0;}
 .pc-tb-mode-btn.active-erotic{background:#2a1a3a;border-color:#9070d0;}
+.pc-tb-mode-btn.active-timejump{background:#1a2a3a;border-color:#5090d0;}
 }
 .pc-tb-collapsible.hidden{display:none;}
 .pc-tb-tabs{display:flex;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid #ddd;padding:0 12px;gap:2px;}
@@ -377,6 +398,9 @@ function injectToolbarStyle() {
 .pc-tb-input{flex:1;padding:8px 12px;border-radius:10px;border:1px solid #e0e0e6;background:#f8f8fa;font-size:13px;color:#1a1a1a;outline:none;font-family:inherit;}
 .pc-tb-input::placeholder{color:#bbb;}
 .pc-tb-input:focus{border-color:#aaa;}
+.pc-tb-pin{padding:7px 10px;border-radius:10px;font-size:14px;background:#f0f0f4;border:1px solid #e0e0e6;cursor:pointer;font-family:inherit;flex-shrink:0;transition:all .12s;line-height:1;}
+.pc-tb-pin:hover{border-color:#c0c0cc;}
+.pc-tb-pin.active{background:#fdf0d0;border-color:#e0b040;}
 .pc-tb-reset{padding:7px 14px;border-radius:10px;font-size:13px;font-weight:500;color:#666;background:#f0f0f4;border:1px solid #e0e0e6;cursor:pointer;font-family:inherit;white-space:nowrap;}
 .pc-tb-reset:hover{color:#333;}
 .pc-tb-apply{background:#1a1a1a;color:#fff;border:none;border-radius:10px;padding:7px 16px;font-size:13px;font-weight:500;cursor:pointer;flex-shrink:0;font-family:inherit;white-space:nowrap;transition:opacity .15s;}
@@ -401,6 +425,8 @@ function injectToolbarStyle() {
   .pc-tb-combo-card{background:#252528;border-color:#3a3a40;}
   .pc-tb-combo-chip{background:#3a3a40;border-color:#4a4a50;color:#ccc;}
   .pc-tb-input{background:#2c2c2e;border-color:#3a3a3c;color:#e0e0e0;}
+  .pc-tb-pin{background:#2c2c2e;border-color:#3a3a3c;}
+  .pc-tb-pin.active{background:#4a3a10;border-color:#e0b040;}
   .pc-tb-reset{background:#2c2c2e;border-color:#3a3a3c;color:#888;}
   .pc-tb-apply{background:#fff;color:#000;}
   .sfw-mode .pc-tb-apply{background:#2a6a9a;color:#fff;}
@@ -422,6 +448,7 @@ function buildToolbarHTML() {
   const condomActive = store.config.condomState === 'on';
   const groups       = getVisibleGroups();
   if (groups.length > 0 && !groups.find(g => g.id===tbActiveGroup)) tbActiveGroup = groups[0].id;
+  const directiveOn  = !!getCharStore().directiveEnabled;
 
   const favTab    = getFavTabEnabled()
     ? `<button class="pc-tb-tab fav-tab${tbActiveGroup==='__fav__'?' active':''}" onclick="pcSwitchTab('__fav__')" data-gid="__fav__">★ 즐겨찾기</button>`
@@ -431,12 +458,17 @@ function buildToolbarHTML() {
     `<button class="pc-tb-tab${g.id===tbActiveGroup?' active':''}" onclick="pcSwitchTab('${g.id}')" data-gid="${g.id}" data-idx="${idx}">${g.label}<span class="pc-tb-tab-x" onclick="pcDeleteGroup('${g.id}',event)">×</span></button>`
   ).join('');
 
+  const timeJumpBtns = Object.keys(TIME_JUMP_LABELS).map(m =>
+    `<button class="pc-tb-mode-btn${tbTimeJump===m?' active active-timejump':''}" onclick="pcToggleTimeJump('${m}')" title="${TIME_JUMP_LABELS[m]}">${m==='hours'?'🕐':m==='day'?'🌙':'📅'}</button>`
+  ).join('');
+
   const condomBtn = isNsfw()
     ? `<button class="pc-tb-condom${condomActive?' active':''}" onclick="pcCondom()">${condomActive?'Condom ON':'Condom'}</button>
        <button class="pc-tb-mode-btn${store.config.soundMode?' active active-sound':''}" onclick="pcToggleSound()" title="Sound">🔊</button>
        <button class="pc-tb-mode-btn${store.config.sceneMode==='hardcore'?' active active-hardcore':''}" onclick="pcToggleScene('hardcore')" title="Hardcore">🔥</button>
        <button class="pc-tb-mode-btn${store.config.sceneMode==='vanilla'?' active active-vanilla':''}" onclick="pcToggleScene('vanilla')" title="Vanilla">🌸</button>
-       <button class="pc-tb-mode-btn${store.config.sceneMode==='erotic'?' active active-erotic':''}" onclick="pcToggleScene('erotic')" title="Erotic">💋</button>`
+       <button class="pc-tb-mode-btn${store.config.sceneMode==='erotic'?' active active-erotic':''}" onclick="pcToggleScene('erotic')" title="Erotic">💋</button>
+       ${timeJumpBtns}`
     : '';
 
   return `
@@ -462,6 +494,7 @@ function buildToolbarHTML() {
         </div>
         <div class="pc-tb-footer">
           <input class="pc-tb-input" id="pc-tb-input" type="text" placeholder="추가 지시를 입력하세요..."/>
+          <button class="pc-tb-pin${directiveOn?' active':''}" id="pc-tb-pin" onclick="pcToggleDirective()" title="지속 지시">📌</button>
           <button class="pc-tb-reset" onclick="pcTbReset()">초기화</button>
           <button class="pc-tb-apply" onclick="pcTbApply()">Apply</button>
         </div>
@@ -793,9 +826,43 @@ window.pcToggleScene = function(mode) {
   });
 };
 
+window.pcToggleDirective = function() {
+  const cd  = getCharStore();
+  const btn = document.getElementById('pc-tb-pin');
+  if (cd.directiveEnabled) {
+    // 켬 → 끔: 입력창 내용과 무관하게 그냥 해제
+    cd.directiveEnabled = false;
+    cd.directiveText    = '';
+  } else {
+    // 끔 → 켬: 클릭 시점의 입력창 텍스트를 지속 지시문으로 저장
+    const inputEl = document.getElementById('pc-tb-input');
+    const text = inputEl?.value?.trim() || '';
+    if (!text) return;
+    cd.directiveEnabled = true;
+    cd.directiveText    = text;
+    if (inputEl) inputEl.value = '';
+  }
+  saveStore();
+  refreshModePrompt();
+  if (btn) btn.classList.toggle('active', cd.directiveEnabled);
+};
+
+window.pcToggleTimeJump = function(mode) {
+  tbTimeJump = tbTimeJump === mode ? null : mode;
+  Object.keys(TIME_JUMP_LABELS).forEach(m => {
+    const btn = document.querySelector(`.pc-tb-mode-btn[title="${TIME_JUMP_LABELS[m]}"]`);
+    if (!btn) return;
+    btn.className = `pc-tb-mode-btn${tbTimeJump===m ? ' active active-timejump' : ''}`;
+  });
+};
+
 window.pcTbReset = function() {
-  tbSelected=[]; tbPendingTag=null; pcHideMiniPopup(); renderToolbarTags(); renderToolbarSelected();
+  tbSelected=[]; tbPendingTag=null; tbTimeJump=null; pcHideMiniPopup(); renderToolbarTags(); renderToolbarSelected();
   const input=document.getElementById('pc-tb-input'); if(input) input.value='';
+  Object.keys(TIME_JUMP_LABELS).forEach(m => {
+    const btn = document.querySelector(`.pc-tb-mode-btn[title="${TIME_JUMP_LABELS[m]}"]`);
+    if (btn) btn.className = 'pc-tb-mode-btn';
+  });
 };
 
 function buildRoleInstruction(tag, role) {
@@ -814,17 +881,22 @@ window.pcTbApply = async function() {
   const parts=[];
   tbSelected.forEach(s=>parts.push(buildRoleInstruction(s.tag,s.role)));
   if (isNsfw() && store.config.condomState==='on') parts.push('put on a condom first');
+  if (tbTimeJump) parts.push(TIME_JUMP_TEXT[tbTimeJump]);
   if (userText) parts.push(`User's additional instruction: "${userText}"`);
   if (!parts.length) return;
 
   const actionMsg=`IMMEDIATE INSTRUCTION: In your very next response, you MUST — ${parts.join('. ')}. Stay in character. Do this without exception.`;
 
-  if (tbSelected.length||userText) {
+  if (tbSelected.length||userText||tbTimeJump) {
     const combo={tags:tbSelected.map(s=>({...s})),inputText:userText};
     pushRecentCombo(combo); saveStore();
   }
 
-  tbSelected=[]; renderToolbarTags(); renderToolbarSelected();
+  tbSelected=[]; tbTimeJump=null; renderToolbarTags(); renderToolbarSelected();
+  Object.keys(TIME_JUMP_LABELS).forEach(m => {
+    const btn = document.querySelector(`.pc-tb-mode-btn[title="${TIME_JUMP_LABELS[m]}"]`);
+    if (btn) btn.className = 'pc-tb-mode-btn';
+  });
   const inputEl=document.getElementById('pc-tb-input'); if(inputEl) inputEl.value='';
 
   try {
@@ -919,7 +991,15 @@ function closeMainHub() {
 // INIT
 // ═══════════════════════════════════════════
 (async function init() {
-  getStore(); renderSettingsPanel(); addWandMenuItem(); injectToolbarStyle();
+  const store = getStore();
+  // 새로고침마다 세션성 토글 초기화 — 저장된 ON 상태를 무시하고 항상 꺼진 채로 시작
+  store.config.toolbarEnabled = false;
+  store.config.condomState    = '';
+  store.config.soundMode      = false;
+  store.config.sceneMode      = '';
+  saveStore();
+
+  renderSettingsPanel(); addWandMenuItem(); injectToolbarStyle();
   const {eventSource,event_types}=ctx();
   eventSource.on(event_types.MESSAGE_RECEIVED,refreshPrompt);
   eventSource.on(event_types.CHAT_CHANGED,()=>{
