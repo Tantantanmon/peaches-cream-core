@@ -402,6 +402,14 @@ function injectToolbarStyle() {
 .pc-tb-input{flex:1;min-width:0;padding:8px 12px;border-radius:10px;border:1px solid #e0e0e6;background:#f8f8fa;font-size:13px;color:#1a1a1a;outline:none;font-family:inherit;}
 .pc-tb-input::placeholder{color:#bbb;}
 .pc-tb-input:focus{border-color:#aaa;}
+.pc-tb-input-shake{border-color:#e05050!important;animation:pcTbShake .4s ease;}
+@keyframes pcTbShake{
+  0%,100%{transform:translateX(0);}
+  20%{transform:translateX(-4px);}
+  40%{transform:translateX(4px);}
+  60%{transform:translateX(-3px);}
+  80%{transform:translateX(3px);}
+}
 .pc-tb-pin{padding:7px 10px;border-radius:10px;font-size:14px;background:#f0f0f4;border:1px solid #e0e0e6;cursor:pointer;font-family:inherit;flex-shrink:0;transition:all .12s;line-height:1;}
 .pc-tb-pin:hover{border-color:#c0c0cc;}
 .pc-tb-pin.active{background:#f0a020;border-color:#f0a020;box-shadow:0 0 0 3px rgba(240,160,32,0.25);}
@@ -487,10 +495,10 @@ function buildToolbarHTML() {
       <div class="pc-tb-wrap${tbEditMode?' edit-mode':''}${tbMode==='sfw'?' sfw-mode':''}">
         <div class="pc-tb-topbar">
           <span class="pc-tb-title" onclick="pcToggleMode()" title="모드 전환">${tbMode==='nsfw'?'🍑':'☁️'}</span>
-          ${condomOnlyBtn}
           <button class="pc-tb-icon-btn${tbEditMode?' edit-on':''}" onclick="pcTbToggleEdit()">⚙</button>
           <button class="pc-tb-icon-btn" onclick="pcTbCollapse()" id="pc-tb-collapse-btn">${tbCollapsed?'▲':'▼'}</button>
           <button class="pc-tb-icon-btn" onclick="pcTbClose()">✕</button>
+          ${condomOnlyBtn}
           <span class="pc-tb-spacer"></span>
           ${condomExtraBtn}
         </div>
@@ -506,7 +514,7 @@ function buildToolbarHTML() {
         </div>
         <div class="pc-tb-footer">
           <input class="pc-tb-input" id="pc-tb-input" type="text" placeholder="추가 지시를 입력하세요..."/>
-          <button class="pc-tb-pin${directiveOn?' active':''}" id="pc-tb-pin" onclick="pcToggleDirective()" title="지속 지시">${directiveOn?'📌 ON':'📌'}</button>
+          <button class="pc-tb-pin${directiveOn?' active':''}" id="pc-tb-pin" onclick="pcToggleDirective()" title="지속 지시">📌</button>
           <button class="pc-tb-reset" onclick="pcTbReset()">초기화</button>
           <button class="pc-tb-apply" onclick="pcTbApply()">Apply</button>
         </div>
@@ -538,7 +546,10 @@ window.pcToggleMode = function() {
     btn.className = `pc-tb-condom${store.config.condomState==='on'?' active':''}`;
     btn.textContent = store.config.condomState==='on'?'Condom ON':'Condom';
     btn.onclick = pcCondom;
-    title.insertAdjacentElement('afterend', btn);
+    // 복숭아 → 수정/접기/닫기 → 콘돔 순서 유지: 닫기(✕) 버튼 뒤에 삽입
+    const closeBtn = topbar.querySelector('.pc-tb-icon-btn[onclick="pcTbClose()"]');
+    if (closeBtn) closeBtn.insertAdjacentElement('afterend', btn);
+    else title.insertAdjacentElement('afterend', btn);
   }
   // 탭/태그 재렌더
   const groups = getVisibleGroups();
@@ -858,7 +869,23 @@ window.pcToggleDirective = function() {
     // 끔 → 켬: 클릭 시점의 입력창 텍스트를 지속 지시문으로 저장
     const inputEl = document.getElementById('pc-tb-input');
     const text = inputEl?.value?.trim() || '';
-    if (!text) return;
+    if (!text) {
+      // 빈 입력창일 땐 조용히 무시하지 않고 눈에 보이는 피드백을 준다
+      if (inputEl) {
+        inputEl.focus();
+        inputEl.classList.remove('pc-tb-input-shake');
+        void inputEl.offsetWidth; // 애니메이션 재시작을 위한 리플로우
+        inputEl.classList.add('pc-tb-input-shake');
+        const origPlaceholder = inputEl.dataset.origPlaceholder || inputEl.placeholder;
+        inputEl.dataset.origPlaceholder = origPlaceholder;
+        inputEl.placeholder = '먼저 지시 내용을 입력하세요';
+        setTimeout(() => {
+          inputEl.classList.remove('pc-tb-input-shake');
+          inputEl.placeholder = origPlaceholder;
+        }, 1200);
+      }
+      return;
+    }
     cd.directiveEnabled = true;
     cd.directiveText    = text;
     if (inputEl) inputEl.value = '';
@@ -867,7 +894,6 @@ window.pcToggleDirective = function() {
   refreshModePrompt();
   if (btn) {
     btn.classList.toggle('active', cd.directiveEnabled);
-    btn.textContent = cd.directiveEnabled ? '📌 ON' : '📌';
   }
 };
 
