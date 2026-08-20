@@ -370,7 +370,7 @@ function injectToolbarStyle() {
 .pc-tb-add-input{padding:6px 13px;border-radius:20px;font-size:13px;background:#fff;color:#1a1a1a;border:1px solid #e0e0e6;outline:none;font-family:inherit;width:110px;}
 .pc-tb-add-input::placeholder{color:#bbb;}
 .pc-tb-add-input:focus{border-color:#aaa;}
-.pc-tb-mini-popup{display:none;padding:3px 6px;background:#fff;border:1px solid #e0e0e0;border-radius:20px;box-shadow:0 2px 8px rgba(0,0,0,0.1);gap:3px;align-items:center;}
+.pc-tb-mini-popup{display:none;padding:3px 6px;background:#fff;border:1px solid #e0e0e0;border-radius:20px;box-shadow:0 2px 8px rgba(0,0,0,0.1);gap:3px;align-items:center;flex-wrap:wrap;max-width:calc(100vw - 16px);}
 .pc-tb-mini-popup.show{display:inline-flex;}
 .pc-tb-mini-role{padding:4px 10px;border-radius:20px;font-size:12px;font-weight:500;border:1px solid #e0e0e0;background:#f0f0f4;color:#555;cursor:pointer;font-family:inherit;transition:all .1s;white-space:nowrap;}
 .pc-tb-mini-role:hover{background:#1a1a1a;color:#fff;border-color:#1a1a1a;}
@@ -404,7 +404,7 @@ function injectToolbarStyle() {
 .pc-tb-input:focus{border-color:#aaa;}
 .pc-tb-pin{padding:7px 10px;border-radius:10px;font-size:14px;background:#f0f0f4;border:1px solid #e0e0e6;cursor:pointer;font-family:inherit;flex-shrink:0;transition:all .12s;line-height:1;}
 .pc-tb-pin:hover{border-color:#c0c0cc;}
-.pc-tb-pin.active{background:#fdf0d0;border-color:#e0b040;}
+.pc-tb-pin.active{background:#f0a020;border-color:#f0a020;box-shadow:0 0 0 3px rgba(240,160,32,0.25);}
 .pc-tb-reset{padding:7px 14px;border-radius:10px;font-size:13px;font-weight:500;color:#666;background:#f0f0f4;border:1px solid #e0e0e6;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;}
 .pc-tb-reset:hover{color:#333;}
 .pc-tb-apply{background:#1a1a1a;color:#fff;border:none;border-radius:10px;padding:7px 16px;font-size:13px;font-weight:500;cursor:pointer;flex-shrink:0;font-family:inherit;white-space:nowrap;transition:opacity .15s;}
@@ -430,7 +430,7 @@ function injectToolbarStyle() {
   .pc-tb-combo-chip{background:#3a3a40;border-color:#4a4a50;color:#ccc;}
   .pc-tb-input{background:#2c2c2e;border-color:#3a3a3c;color:#e0e0e0;}
   .pc-tb-pin{background:#2c2c2e;border-color:#3a3a3c;}
-  .pc-tb-pin.active{background:#4a3a10;border-color:#e0b040;}
+  .pc-tb-pin.active{background:#f0a020;border-color:#f0a020;box-shadow:0 0 0 3px rgba(240,160,32,0.3);}
   .pc-tb-reset{background:#2c2c2e;border-color:#3a3a3c;color:#888;}
   .pc-tb-apply{background:#fff;color:#000;}
   .sfw-mode .pc-tb-apply{background:#2a6a9a;color:#fff;}
@@ -471,9 +471,11 @@ function buildToolbarHTML() {
     `<button class="pc-tb-mode-btn${tbTimeJump===m?' active active-timejump':''}" onclick="pcToggleTimeJump('${m}')" title="${TIME_JUMP_LABELS[m]}">${m==='hours'?'🕐':m==='day'?'🌙':'📅'}</button>`
   ).join('');
 
-  const condomBtn = isNsfw()
-    ? `<button class="pc-tb-condom${condomActive?' active':''}" onclick="pcCondom()">${condomActive?'Condom ON':'Condom'}</button>
-       <button class="pc-tb-mode-btn${store.config.soundMode?' active active-sound':''}" onclick="pcToggleSound()" title="Sound">🔊</button>
+  const condomOnlyBtn = isNsfw()
+    ? `<button class="pc-tb-condom${condomActive?' active':''}" onclick="pcCondom()">${condomActive?'Condom ON':'Condom'}</button>`
+    : '';
+  const condomExtraBtn = isNsfw()
+    ? `<button class="pc-tb-mode-btn${store.config.soundMode?' active active-sound':''}" onclick="pcToggleSound()" title="Sound">🔊</button>
        <button class="pc-tb-mode-btn${store.config.sceneMode==='hardcore'?' active active-hardcore':''}" onclick="pcToggleScene('hardcore')" title="Hardcore">🔥</button>
        <button class="pc-tb-mode-btn${store.config.sceneMode==='vanilla'?' active active-vanilla':''}" onclick="pcToggleScene('vanilla')" title="Vanilla">🌸</button>
        <button class="pc-tb-mode-btn${store.config.sceneMode==='erotic'?' active active-erotic':''}" onclick="pcToggleScene('erotic')" title="Erotic">💋</button>
@@ -485,11 +487,12 @@ function buildToolbarHTML() {
       <div class="pc-tb-wrap${tbEditMode?' edit-mode':''}${tbMode==='sfw'?' sfw-mode':''}">
         <div class="pc-tb-topbar">
           <span class="pc-tb-title" onclick="pcToggleMode()" title="모드 전환">${tbMode==='nsfw'?'🍑':'☁️'}</span>
-          ${condomBtn}
-          <span class="pc-tb-spacer"></span>
+          ${condomOnlyBtn}
           <button class="pc-tb-icon-btn${tbEditMode?' edit-on':''}" onclick="pcTbToggleEdit()">⚙</button>
           <button class="pc-tb-icon-btn" onclick="pcTbCollapse()" id="pc-tb-collapse-btn">${tbCollapsed?'▲':'▼'}</button>
           <button class="pc-tb-icon-btn" onclick="pcTbClose()">✕</button>
+          <span class="pc-tb-spacer"></span>
+          ${condomExtraBtn}
         </div>
         <div class="pc-tb-collapsible${tbCollapsed?' hidden':''}" id="pc-tb-collapsible">
           <div class="pc-tb-tabs" id="pc-tb-tabs">${tabsHTML}</div>
@@ -503,7 +506,7 @@ function buildToolbarHTML() {
         </div>
         <div class="pc-tb-footer">
           <input class="pc-tb-input" id="pc-tb-input" type="text" placeholder="추가 지시를 입력하세요..."/>
-          <button class="pc-tb-pin${directiveOn?' active':''}" id="pc-tb-pin" onclick="pcToggleDirective()" title="지속 지시">📌</button>
+          <button class="pc-tb-pin${directiveOn?' active':''}" id="pc-tb-pin" onclick="pcToggleDirective()" title="지속 지시">${directiveOn?'📌 ON':'📌'}</button>
           <button class="pc-tb-reset" onclick="pcTbReset()">초기화</button>
           <button class="pc-tb-apply" onclick="pcTbApply()">Apply</button>
         </div>
@@ -721,9 +724,18 @@ function pcShowMiniPopup(el, tag, group) {
     btn.onclick=(ev)=>{ ev.stopPropagation(); tbSelected.push({tag,group,role:r.id,roleLabel:r.label}); pcHideMiniPopup(); renderToolbarTags(); renderToolbarSelected(); };
     popup.appendChild(btn);
   });
-  const rect=el.getBoundingClientRect();
-  popup.style.cssText=`position:fixed;top:${rect.bottom+4}px;left:${rect.left}px;z-index:99999;`;
   document.body.appendChild(popup);
+  const rect   = el.getBoundingClientRect();
+  const margin = 8;
+  const popupW = popup.offsetWidth;
+  const popupH = popup.offsetHeight;
+  let left = rect.left;
+  if (left + popupW > window.innerWidth - margin)  left = window.innerWidth - popupW - margin;
+  if (left < margin) left = margin;
+  let top = rect.bottom + 4;
+  if (top + popupH > window.innerHeight - margin)  top = rect.top - popupH - 4; // 아래 공간 부족하면 위로 뒤집기
+  if (top < margin) top = margin;
+  popup.style.cssText=`position:fixed;top:${top}px;left:${left}px;z-index:99999;`;
 }
 
 function pcHideMiniPopup() { document.getElementById('pc-tb-mini-popup')?.remove(); tbPendingTag=null; }
@@ -853,7 +865,10 @@ window.pcToggleDirective = function() {
   }
   saveStore();
   refreshModePrompt();
-  if (btn) btn.classList.toggle('active', cd.directiveEnabled);
+  if (btn) {
+    btn.classList.toggle('active', cd.directiveEnabled);
+    btn.textContent = cd.directiveEnabled ? '📌 ON' : '📌';
+  }
 };
 
 window.pcToggleTimeJump = function(mode) {
