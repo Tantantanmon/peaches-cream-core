@@ -399,13 +399,13 @@ function injectToolbarStyle() {
 .pc-tb-empty{font-size:13px;color:#bbb;padding:20px 0;text-align:center;width:100%;}
 .pc-tb-footer{display:flex;align-items:center;gap:8px;padding:8px 12px 10px;border-top:1px solid #ddd;}
 .sfw-mode .pc-tb-footer{border-top-color:#cce4f4;}
-.pc-tb-input{flex:1;padding:8px 12px;border-radius:10px;border:1px solid #e0e0e6;background:#f8f8fa;font-size:13px;color:#1a1a1a;outline:none;font-family:inherit;}
+.pc-tb-input{flex:1;min-width:0;padding:8px 12px;border-radius:10px;border:1px solid #e0e0e6;background:#f8f8fa;font-size:13px;color:#1a1a1a;outline:none;font-family:inherit;}
 .pc-tb-input::placeholder{color:#bbb;}
 .pc-tb-input:focus{border-color:#aaa;}
 .pc-tb-pin{padding:7px 10px;border-radius:10px;font-size:14px;background:#f0f0f4;border:1px solid #e0e0e6;cursor:pointer;font-family:inherit;flex-shrink:0;transition:all .12s;line-height:1;}
 .pc-tb-pin:hover{border-color:#c0c0cc;}
 .pc-tb-pin.active{background:#fdf0d0;border-color:#e0b040;}
-.pc-tb-reset{padding:7px 14px;border-radius:10px;font-size:13px;font-weight:500;color:#666;background:#f0f0f4;border:1px solid #e0e0e6;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.pc-tb-reset{padding:7px 14px;border-radius:10px;font-size:13px;font-weight:500;color:#666;background:#f0f0f4;border:1px solid #e0e0e6;cursor:pointer;font-family:inherit;white-space:nowrap;flex-shrink:0;}
 .pc-tb-reset:hover{color:#333;}
 .pc-tb-apply{background:#1a1a1a;color:#fff;border:none;border-radius:10px;padding:7px 16px;font-size:13px;font-weight:500;cursor:pointer;flex-shrink:0;font-family:inherit;white-space:nowrap;transition:opacity .15s;}
 .sfw-mode .pc-tb-apply{background:#2a6a9a;}
@@ -440,6 +440,11 @@ function injectToolbarStyle() {
 @media(max-width:430px){
   #pc-popup-overlay{align-items:flex-end!important;justify-content:center!important;}
   #pc-popup-wrap{width:100%!important;height:92vh!important;height:92dvh!important;border-radius:24px 24px 0 0!important;padding-bottom:env(safe-area-inset-bottom,0px)!important;}
+  .pc-tb-footer{gap:5px;padding:8px 8px 10px;}
+  .pc-tb-input{min-width:44px;padding:8px 8px;font-size:12.5px;}
+  .pc-tb-pin{padding:7px 8px;}
+  .pc-tb-reset{padding:7px 9px;font-size:12px;}
+  .pc-tb-apply{padding:7px 10px;font-size:12px;}
 }`;
   document.head.appendChild(s);
 }
